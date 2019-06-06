@@ -1,269 +1,331 @@
 # Mobility Data Specification: **Agency**
 
-This specification contains a collection of RESTful APIs used to specify the digital relationship between *mobility as a service* providers and the agencies that regulate them.
+This specification contains a collection of RESTful APIs used to specify the digital relationship between *mobility as a service* Providers and the Agencies that regulate them.
 
 * Authors: LADOT
-* Date: 10 Aug 2018
-* Version: ALPHA
+* Date: 25 Feb 2019	
+* Version: BETA
 
 ## Table of Contents
 
-* [register_vehicle](#register_vehicle)
-* [deregister_vehicle](#deregister_vehicle)
-* [update_vehicle_status](#update_vehicle_status)
-* [start_trip](#start_trip)
-* [end_trip](#start_trip)
-* [update_trip_telemetry](#update_trip_telemetry)
-* [service_areas](#service_areas)
-* [Event types](#Event-Types)
+* [Authorization](#authorization)
+* [Timestamps](#timestamps)
+* [Vehicles](#vehicles)
+* [Vehicle - Register](#vehicle---register)
+* [Vehicle - Event](#vehicle---event)
+* [Vehicles - Update Telemetry](#vehicles---telemetry)
+* [Service Areas](#service-areas)
+* [Vehicle Events](#vehicle-events)
+* [Telemetry Data](#telemetry-data)
 * [Enum definitions](#enum-definitions)
+* [Responses](#responses)
 
-## register_vehicle
+## Authorization
 
-The Vehicle Registration API is required in order to register a vehicle for use in the system. The API will require a valid `provider_id` and `api_key`.
+When making requests, the Agency API expects `provider_id` to be part of the claims in a [JWT](https://jwt.io/)  `access_token` in the `Authorization` header, in the form `Authorization: Bearer <access_token>`. The token issuance, expiration and revocation policies are at the discretion of the Agency.
 
-Endpoint: `/register_vehicle`  
-Method: `POST`  
-API Key: `Required`  
-Body:
+## Timestamps
 
-| Field | Type     | Required/Optional | Other |
-| ----- | -------- | ----------------- | ----- |
-| `unique_id` | UUID | UUID v4 provided by Operator to uniquely identify a vehicle |
-| `provider_id` | String | Required | Issued by city |
-| `vehicle_id` | String |  | Vehicle Identification Number (VIN) visible on device|
-| `vehicle_type` | Enum | Required | Vehicle Type |
-| `propulsion_type` | Enum | Required | Propulsion Type |
-| `vehicle_year` | Enum | Required | Year Manufactured |
-| `vehicle_mfgr` | Enum | Required | Vehicle Manufacturer |
-| `vehicle_model` | Enum | Required | Vehicle Model |
+As with the Provider API, `timestamp` refers to integer milliseconds since Unix epoch. 
 
-Response:
+## Vehicles
 
-| Field | Type     | Required/Optional | Other |
-| ----- | -------- | ----------------- | ----- |
-| `message` | Enum |  | See [Message](#message) Enum |
+The `/vehicles` endpoint returns the specified vehicle (if a device_id is provided) or a list of known vehicles.  Providers can only retrieve data for vehicles in their registered fleet.
 
+Endpoint: `/vehicles/{device_id}`
+Method: `GET`
 
-## deregister_vehicle
+Path Params:
 
-The remove-vehicle API is used to deregister a vehicle from the fleet.
+| Param        | Type | Required/Optional | Description                                 |
+| ------------ | ---- | ----------------- | ------------------------------------------- |
+| `device_id` | UUID  | Optional          | If provided, retrieve the specified vehicle |
 
-Endpoint: `/deregister_vehicle`  
-Method: `POST`  
-API Key: `Required`  
-Body:
+200 Success Response:
 
-| Field | Type     | Required/Optional | Other |
-| ----- | -------- | ----------------- | ----- |
-| `unique_id` | UUID | ID used in [Register](#register_vehicle) |
-| `device_id` | UUID | Required | |
-| `reason_code` | Enum | Required | [Reason](#reason_code) for status change  |
+If `device_id` is specified, `GET` will return a single vehicle record, otherwise it will be a list of vehicle records with pagination details per the [JSON API](https://jsonapi.org/format/#fetching-pagination) spec:
 
-
-Response:
-
-| Field | Type     | Required/Optional | Other |
-| ----- | -------- | ----------------- | ----- |
-| `message` | Enum |  | See [Message](#message) Enum |
-
-## update_vehicle_status
-
-This API is used by providers when a vehicle is either removed or returned to service.
-
-Endpoint: `/update_vehicle_status`  
-Method: `POST`
-API Key: `Required`
-Body:
-
-| Field | Type | Required/Optional | Other |
-| ----- | ---- | ----------------- | ----- |
-| `unique_id` | UUID | ID used in [Register](#register_vehicle) |
-| `timestamp` | Unix Timestamp | Required | Date/time that event occurred. Based on GPS clock. |
-| `location` | Point | Required | Location at the time of status change in WGS 84 (EPSG:4326) standard GPS projection  |
-| `event_type` | Enum | Required | [Event Type](#event_type) for status change.  |
-| `reason_code` | Enum | Required | [Reason](#reason_code) for status change.  |
-| `battery_pct` | Float | Require if Applicable | Percent battery charge of device, expressed between 0 and 1 |
-
-Response:
-
-| Field | Type     | Required/Optional | Other |
-| ----- | -------- | ----------------- | ----- |
-| `message` | Enum |  | See [Message](#message) Enum |
-
-## start_trip
-
-Endpoint: `/start_trip`  
-Method: `POST`
-API Key: `Required`
-Body:
-
-| Field | Type | Required/Optional | Other |
-| ----- | ---- | ----------------- | ----- |
-| `unique_id` | UUID | ID used in [Register](#register_vehicle) |
-| `provider_id` | String | Required | Issued by city |
-| `vehicle_id` | String | Required | Provided by the Vehicle Registration API |
-| `timestamp` | Unix Timestamp | Required | Date/time that event occurred. Based on GPS clock. |
-| `location` | Point | Required | Location at the time of status change in WGS 84 (EPSG:4326) standard GPS projection  |
-| `accuracy` | Integer | Required | The approximate level of accuracy, in meters, represented by start_point and end_point. |
-| `battery_pct_start` | Float | Require if Applicable | Percent battery charge of device, expressed between 0 and 1 |
-
-
-Response:
-
-| Field | Type     | Required/Optional | Other |
-| ----- | -------- | ----------------- | ----- |
-| `trip_id` | UUID | Required | a unique ID for each trip |
-
-
-## end_trip
-
-Endpoint: `/end_trip`  
-Method: `POST`
-API Key: `Required`
-Body:
-
-| Field | Type | Required/Optional | Other |
-| ----- | ---- | ----------------- | ----- |
-| `trip_id` | UUID | Required | See [start_trip](#start_trip) |
-| `timestamp` | Unix Timestamp | Required | Date/time that event occurred. Based on GPS clock. |
-| `location` | Point | Required | Location at the time of status change in WGS 84 (EPSG:4326) standard GPS projection  |
-| `accuracy` | Integer | Required | The approximate level of accuracy, in meters, represented by start_point and end_point. |
-| `battery_pct_end` | Float | Require if Applicable | Percent battery charge of device, expressed between 0 and 1 |
-
-## update_trip_telemetry
-
-A trip represents a route taken by a provider's customer.   Trip data will be reported to the API every 5 seconds while the vehicle is in motion.   
-
-Endpoint: `/update_trip_telemetry`  
-Method: `POST`
-API Key: `Required`
-Body:
-
-| Field | Type     | Required/Optional | Other |
-| ----- | -------- | ----------------- | ----- |
-| `trip_id` | UUID | Required | Issued by InitMovementPlan() API  |
-| `timestamp` | Unix Timestamp | Required | Time of day (UTC) data was sampled|
-| `route` | Route | Required | See detail below. |
-| `accuracy` | Integer | Required | The approximate level of accuracy, in meters, represented by start_point and end_point. |
-
-Response:
-
-| Field | Type | Other |
-| ---- | --- | --- |
-| `message` | Enum | See [Message](#message) Enum |
-
-
-### Route
-
-To represent a route, MDS provider APIs should create a GeoJSON Feature Collection where ever observed point in the route, plus a time stamp, should be included. The representation needed is below.
-
-The route must include at least 2 points, a start point and end point. Additionally, it must include all possible GPS samples collected by a provider. All points must be in WGS 84 (EPSG:4326) standard GPS projection
 ```
+{
+	"vehicles": [ ... ]
+ 	"links": {
+        "first": "https://...",
+        "last": "https://...",
+        "prev": "https://...",
+        "next": "https://..."
+    }
+}
+``` 
+  
+A vehicle record is as follows:
 
-"route": {
-        "type": "FeatureCollection",
-        "features": [
-            {
-                "type": "Feature",
-                "properties": {
-                    "timestamp": 1529968782.421409
-                },
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [
-                        -118.46710503101347,
-                        33.9909333514159
-                    ]
-                }
-            },
-            {
-                "type": "Feature",
-                "properties": {
-                    "timestamp": 1531007628.3774529
-                },
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [
-                        -118.464851975441,
-                        33.990366257735
-                    ]
-                }
-            }
-        ] }
-```
-## service_areas
+| Field         | Type      | Field Description                                                             |
+| ------------- | --------- | ----------------------------------------------------------------------------- |
+| `device_id`   | UUID      | Provided by Operator to uniquely identify a vehicle                           |
+| `provider_id` | UUID      | Issued by City and [tracked](../providers.csv)                                |
+| `vehicle_id`  | String    | Vehicle Identification Number (vehicle_id) visible on vehicle                 |
+| `type`        | Enum      | [Vehicle Type](#vehicle-type)                                                 |
+| `propulsion`  | Enum[]    | Array of [Propulsion Type](#propulsion-type); allows multiple values          |
+| `year`        | Integer   | Year Manufactured                                                             |
+| `mfgr`        | String    | Vehicle Manufacturer                                                          |
+| `model`       | String    | Vehicle Model                                                                 |
+| `status`      | Enum      | Current vehicle status. See [Vehicle Status](#vehicle-events)                 |
+| `prev_event`  | Enum      | Last [Vehicle Event](#vehicle-events)                                         |
+| `updated`     | Timestamp | Date of last event update                                                     |
 
-Gets the list of service areas available to the provider.
+404 Failure Response:
 
-Endpoint: `/service_areas`  
-Method: `GET`  
-Body:
+_No content returned on vehicle not found._
 
-| Field | Type | Required/Optional | Other |
-| ----- | ---- | ----------------- | ----- |
-| `provider_id` | String | Required | Issued by city |
-| `service_area_id` | UUID | Required |  |
-| `service_start_date` | Unix Timestamp | Required | Date at which this service area became effective |
-| `service_end_date` | Unix Timestamp | Required | Date at which this service area was replaced. If currently effective, place NaN |
-| `service_area` | MultiPolygon | Required | |
-| `prior_service_area` | UUID | Optional | If exists, the UUID of the prior service area. |
-| `replacement_service_area` | UUID | Optional | If exists, the UUID of the service area that replaced this one |
+## Vehicle - Register
 
-### Event Types
+The `/vehicles` registration endpoint is used to register a vehicle for use in the Agency jurisdiction. 
 
-| event_type | event_type_description |  reason | reason_description	|
-| ---------- | ---------------------- | ------- | ------------------  |
-| `available` |	A device becomes available for customer use	| `service_start` |	Device introduced into service at the beginning of the day (if program does not operate 24/7) |
-| | | `user_drop_off` |	User ends reservation |
-| | | `rebalance_drop_off` |	Device moved for rebalancing |
-| | | `maintenance_drop_off` | 	Device introduced into service after being removed for maintenance |
-| `reserved` | A customer reserves a device (even if trip has not started yet) |	`user_pick_up` |	Customer reserves device |
-| `unavailable` |	A device is on the street but becomes unavailable for customer use | `default` |  Default state for a newly registered vehicle	|
-| | | `low_battery` | A device is no longer available due to insufficient battery |
-| | | ``maintenance`` | A device is no longer available due to equipment issues |
-| `removed` | A device is removed from the street and unavailable for customer use | `service_end`	| Device removed from street because service has ended for the day (if program does not operate 24/7) |
-| | | `rebalance_pick_up` |	Device removed from street and will be placed at another location to rebalance service |
-| | | `maintenance_pick_up`	 | Device removed from street so it can be worked on |
-| `inactive` | A device has been deregistered  | 	|  |
+Endpoint: `/vehicles`
+Method: `POST`
+
+Body Params:
+
+| Field        | Type    | Required/Optional | Field Description                                                    |
+| ------------ | ------- | ----------------- | -------------------------------------------------------------------- |
+| `device_id`  | UUID     | Required          | Provided by Operator to uniquely identify a vehicle                 |
+| `vehicle_id` | String  | Required          | Vehicle Identification Number (vehicle_id) visible on vehicle        |
+| `type`       | Enum    | Required          | [Vehicle Type](#vehicle-type)                                        |
+| `propulsion` | Enum[]  | Required          | Array of [Propulsion Type](#propulsion-type); allows multiple values |
+| `year`       | Integer | Optional          | Year Manufactured                                                    |
+| `mfgr`       | String  | Optional          | Vehicle Manufacturer                                                 |
+| `model`      | String  | Optional          | Vehicle Model                                                        |
+
+201 Success Response:
+
+_No content returned on success._
+
+400 Failure Response:
+
+| `error`              | `error_description`                               | `error_details`[]               |
+| -------------------- | ------------------------------------------------- | ------------------------------- |
+| `bad_param`          | A validation error occurred.                      | Array of parameters with errors |
+| `missing_param`      | A required parameter is missing.                  | Array of missing parameters     |
+
+409 Failure Response:
+
+| `error`              | `error_description`                               | `error_details`[]               |
+| -------------------- | ------------------------------------------------- | ------------------------------- |
+| `already_registered` | A vehicle with `device_id` is already registered  |                                 |
+
+## Vehicle - Update
+
+The `/vehicles` update endpoint is used to update some mutable aspect of a vehicle.  For now, only `vehicle_id`. 
+
+Endpoint: `/vehicles/{device_id}`
+Method: `PUT`
+
+Body Params:
+
+| Field        | Type    | Required/Optional | Field Description                                                    |
+| ------------ | ------- | ----------------- | -------------------------------------------------------------------- |
+| `vehicle_id` | String  | Required          | Vehicle Identification Number (vehicle_id) visible on vehicle               |
+
+201 Success Response:
+
+_No content returned on success._
+
+400 Failure Response:
+
+| `error`              | `error_description`                               | `error_details`[]               |
+| -------------------- | ------------------------------------------------- | ------------------------------- |
+| `bad_param`          | A validation error occurred.                      | Array of parameters with errors |
+| `missing_param`      | A required parameter is missing.                  | Array of missing parameters     |
+
+404 Failure Response:
+
+_No content returned if no vehicle matching `device_id` is found._
+
+## Vehicle - Event
+
+The vehicle `/event` endpoint allows the Provider to control the state of the vehicle including deregister a vehicle from the fleet.
+
+Endpoint: `/vehicles/{device_id}/event`
+Method: `POST`
+
+Path Params:
+
+| Field        | Type | Required/Optional | Field Description                        |
+| ------------ | ---- | ----------------- | ---------------------------------------- |
+| `device_id`  | UUID | Required          | ID used in [Register](#vehicle-register) |
+
+Body Params:
+
+| Field       | Type                          | Required/Optional | Field Description                                                                                                                          |
+| ----------- | ----------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `event_type` | Enum                         | Required          | see [Vehicle Events](#vehicle-events)                                                                                                           |
+| `event_type_reason` | Enum                  | Required if Available | see [Vehicle Events](#vehicle-events)                                                                                                           |
+| `timestamp`  | Timestamp                    | Required          | Date of last event update                                                     |
+| `telemetry`  | [Telemetry](#telemetry-data) | Required          | Single point of telemetry                             |
+| `trip_id`    | UUID                         | Optional          | UUID provided by Operator to uniquely identify the trip. Required for `trip_start`, `trip_end`, `trip_enter`, and `trip_leave` event types |
+
+201 Success Response:
+
+| Field        | Type | Field Description                                                             |
+| ------------ | ---- | ----------------------------------------------------------------------------- |
+| `device_id`  | UUID | UUID provided by Operator to uniquely identify a vehicle                      |
+| `status`     | Enum | Vehicle status based on posted `event_type`. See [Vehicle Status](#vehicle-events) |
+
+400 Failure Response:
+
+| `error`             | `error_description`             | `error_details`[]               |
+| ------------------- | ------------------------------- | ------------------------------- |
+| `bad_param`         | A validation error occurred     | Array of parameters with errors |
+| `missing_param`     | A required parameter is missing | Array of missing parameters     |
+| `unregistered`      | Vehicle is not registered       |                                 |
+
+## Vehicles - Telemetry
+
+The vehicle `/telemetry` endpoint allows a Provider to send vehicle telemetry data in a batch for any number of vehicles in the fleet.
+
+The Update Telemetry endpoint (/telemetry) shall be called for the specific trip within 24 hrs after the vehicle trip is over.   
+For any given trip, data reported via the (/telemetry) endpoint shall contain temporal and location data for every 300 ft (91 meters) while vehicle is in motion and 30 seconds while at rest. For Mobility Service Providers who do not calculate distance in real-time, a periodic rate of 14 seconds can be used while vehicle is in motion.
+
+Endpoint: `/vehicles/telemetry`
+Method: `POST`
+
+Body Params:
+
+| Field         | Type                           | Required/Optional | Field Description                                                                      |
+| ------------- | ------------------------------ | ----------------- | -------------------------------------------------------------------------------------- |
+| `data`        | [Telemetry](#telemetry-data)[] | Required          | Array of telemetry for one or more vehicles.                                           |
+
+201 Success Response:
+
+| Field     | Type                           | Field Description                                                                                       |
+| --------- | ------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `result`  | String                         | Responds with number of successfully written telemetry data points and total number of provided points. |
+| `failures | [Telemetry](#telemetry-data)[] | Array of failed telemetry for zero or more vehicles (empty if all successful).                          |
+
+400 Failure Response:
+
+| `error`         | `error_description`                  | `error_details`[]               |
+| --------------- | ------------------------------------ | ------------------------------- |
+| `bad_param`     | A validation error occurred.         | Array of parameters with errors |
+| `invalid_data`  | None of the provided data was valid. |                                 |
+| `missing_param` | A required parameter is missing.     | Array of missing parameters     |
+
+## Service Areas
+
+The `/service_areas` endpoint gets the list of service areas available to the Provider or a single area.
+
+Endpoint: `/service_areas/{service_area_id}`
+Method: `GET`
+
+Path Params:
+
+| Field             | Type | Required/Optional | Field Description                                                                                                                     |
+| ----------------- | ---- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `service_area_id` | UUID | Optional          | If provided, retrieve a specific service area (e.g. a retired or old service area). If omitted, will return all active service areas. |
+
+Query Params:
+
+| Parameter     | Type   | Required/Optional | Description                                                                                                                                                                |
+| ------------- | ------ | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bbox`        | String | Optional          | The bounding box upper, left, lower and right coordinates in WGS84 degrees. All geometries overlapping this rectangle will be returned. The format is: `lat,long;lat,long` |
+
+200 Success Response:
+
+| Field              | Types                               | Required/Optional | Field Description                                                                           |
+| ------------------ | ----------------------------------- | ----------------- | ------------------------------------------------------------------------------------------- |
+| `service_area_id`  | UUID                                 | Required          | UUID issued by city                                                                       |
+| `start_date`       | Timestamp                            | Required          | Date at which this service area became effective                                            |
+| `end_date`         | Timestamp                            | Optional          | If exists, Date at which this service area was replaced.                                    |
+| `area`             | MultiPolygon                         | Required          | GeoJson [MultiPolygon](https://tools.ietf.org/html/rfc7946#section-3.1.7) in WGS84 degrees. |
+| `prev_area`        | UUID                                 | Optional          | If exists, the UUID of the prior service area.                                              |
+| `replacement_area` | UUID                                 | Optional          | If exists, the UUID of the service area that replaced this one                              |
+| `type`             | Enum                                 | Required          | See [area types](#area-types)                                                         |
+
+## Vehicle Events
+
+List of valid vehicle events and the resulting vehicle status if the event is sucessful.  Note that to handle out-of-order events, the validity of the initial-status is not enforced.  Events received out-of-order may result in transient incorrect vehicle states.
+
+| `event_type`         | `event_type_reason`                                     | description                                                                                    | valid initial `status`                             | `status` on success | status_description                                                      |
+| -------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------- | ----------------------------------------------------------------------- |
+| `register`           |                                                         | Default state for a newly registered vehicle                                                   | `inactive`                                         | `removed`           | A vehicle is in the active fleet but not yet available for customer use |
+| `service_start`      |                                                         | Vehicle introduced into service at the beginning of the day (if program does not operate 24/7) | `unavailable`                                      | `available`         | Vehicle is on the street and available for customer use.                |
+| `service_end`        | `low_battery`, `maintenance`, `compliance`, `off_hours` | A vehicle is no longer available due to `event_type_reason`                                         | `available`                                        | `unavailable`       |                                                                         |
+| `provider_drop_off`  |                                                         | Vehicle moved for rebalancing                                                                  | `removed`, `elsewhere`                             | `available`         |                                                                         |
+| `provider_pick_up`   | `rebalance`, `maintenance`, `charge`, `compliance`      | Vehicle removed from street and will be placed at another location to rebalance service        | `available`, `unavailable`, `elsewhere`            | `removed`           |                                                                         |
+| `city_pick_up`       |                                                         | Vehicle removed by city                                                                        | `available`, `unavailable`                         | `removed`           |                                                                         |
+| `reserve`            |                                                         | Customer reserves vehicle                                                                      | `available`                                        | `reserved`          | Vehicle is reserved or in use.                                          |
+| `cancel_reservation` |                                                         | Customer cancels reservation                                                                   | `reserved`                                         | `available`         |                                                                         |
+| `trip_start`         |                                                         | Customer starts a trip                                                                         | `available`, `reserved`                            | `trip`              |                                                                         |
+| `trip_enter`         |                                                         | Customer enters the municipal area managed by agency during an active trip.                        | `removed`, `elsewhere`                             | `trip`              |                                                                         |
+| `trip_leave`         |                                                         | Customer leaves the municipal area managed by agency during an active trip.                        | `trip`                                             | `elsewhere`         |                                                                         |
+| `trip_end`           |                                                         | Customer ends trip and reservation                                                             | `trip`                                             | `available`         |                                                                         |
+| `deregister`         | `missing`, `decommissioned`                             | A vehicle is deregistered                                                                      | `available`, `unavailable`, `removed`, `elsewhere` | `inactive`          | A vehicle is deactivated from the fleet.                                |
+
+The diagram below shows the expected events and related `status` transitions for a vehicle:
+![Event State Diagram](images/MDS_agency_event_state.png?raw=true "MDS Event State Diagram")
+
+## Telemetry Data
+
+A standard point of vehicle telemetry. References to latitude and longitude imply coordinates encoded in the [WGS 84 (EPSG:4326)](https://en.wikipedia.org/wiki/World_Geodetic_System) standard GPS projection expressed as [Decimal Degrees](https://en.wikipedia.org/wiki/Decimal_degrees).
+
+| Field          | Type           | Required/Optional     | Field Description                                            |
+| -------------- | -------------- | --------------------- | ------------------------------------------------------------ |
+| `device_id`    | UUID           | Required              | ID used in [Register](#vehicle-register)                     |
+| `timestamp`    | Timestamp      | Required              | Date/time that event occurred. Based on GPS clock            |
+| `gps`          | Object         | Required              | Telemetry position data                                      |
+| `gps.lat`      | Double         | Required              | Latitude of the location                                     |
+| `gps.lng`      | Double         | Required              | Longitude of the location                                    |
+| `gps.altitude` | Double         | Required if Available | Altitude above mean sea level in meters                      |
+| `gps.heading`  | Double         | Required if Available | Degrees - clockwise starting at 0 degrees at true North      |
+| `gps.speed`    | Float          | Required if Available | Speed in meters / sec                                        |
+| `gps.hdop`     | Float          | Required if Available | Horizontal GPS accuracy value (see [hdop](https://support.esri.com/en/other-resources/gis-dictionary/term/358112bd-b61c-4081-9679-4fca9e3eb926)) |
+| `gps.satellites` | Integer      | Required if Available | Number of GPS satellites
+| `charge`       | Float          | Required if Applicable | Percent battery charge of vehicle, expressed between 0 and 1 |
 
 ## Enum Definitions
-=======
-| `service_area` | MultiPolygon | Required | | 
-| `prior_service_area` | UUID | Optional | If exists, the UUID of the prior service area. | 
-| `replacement_service_area` | UUID | Optional | If exists, the UUID of the service area that replaced this one | 
 
-## Enum Definitions 
+### Area Types
 
-#### vehicle_type
-For `vehicle_type`, options are:
-* `bike`
-* `scooter`
-* `recumbent`
+| `type`               | Description                                                                                                                                                                                                                                                                                           |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `unrestricted`       | Areas where vehicles may be picked up/dropped off. A provider's unrestricted area shall be contained completely inside the agency's unrestricted area for the provider in question, but it need not cover the entire agency unrestricted area. See the provider version of the service areas endpoint |
+| `restricted`         | Areas where vehicle pick-up/drop-off is not allowed                                                                                                                                                                                                                                                   |
+| `preferred_pick_up`  | Areas where users are encouraged to pick up vehicles                                                                                                                                                                                                                                                  |
+| `preferred_drop_off` | Areas where users are encouraged to drop off vehicles                                                                                                                                                                                                                                                 |
 
-#### propulsion_type
-For `propulsion_type`, options are:
-* `human`
-* `electric`
-* `combustion`
+### Vehicle Type
 
-#### reason_code
-For `reason_code`, options are:
-* `rebalancing`
-* `maintenance`
+| `type`    |
+| --------- |
+| `bicycle` |
+| `scooter` |
+
+### Propulsion Type
+
+| `propulsion`      | Description                                            |
+| ----------------- | ------------------------------------------------------ |
+| `human`           | Pedal or foot propulsion                               |
+| `electric_assist` | Provides power only alongside human propulsion         |
+| `electric`        | Contains throttle mode with a battery-powered motor    |
+| `combustion`      | Contains throttle mode with a gas engine-powered motor |
+
+A vehicle may have one or more values from the `propulsion`, depending on the number of modes of operation. For example, a scooter that can be powered by foot or by electric motor would have the `propulsion` represented by the array `['human', 'electric']`. A bicycle with pedal-assist would have the `propulsion` represented by the array `['human', 'electric_assist']` if it can also be operated as a traditional bicycle.
+
+## Responses
 
 
-#### message
-For 'message', options are: 
-* `200: OK`
-* `201: Created`
-* `202: Accepted`
-* `203: Added`
-* `204: Removed`
-* `210: Warning: vehicle used in this trip has not been properly registered`
-* `305: Error: vehicle is already registered`
-* `306: Error: vehicle registration cannot be found`
-* `310: Error: vehicle is not properly registered`
-* `311: Error: duplicate registration found, please use a different unique_id`
-* `315: Error: vehicle is not active`
-* `320: Error: vehicle trip has not been properly started`
+* **200:** OK: operation successful.
+* **201:** Created: `POST` operations, new object created
+* **400:** Bad request.
+* **401:** Unauthorized: Invalid, expired, or insufficient scope of token.
+* **404:** Not Found: Object does not exist, returned on `GET` or `POST` operations if the object does not exist.
+* **409:** Conflict: `POST` operations when an object already exists and an update is not possible.
+* **500:** Internal server error: In this case, the answer may contain a `text/plain` body with an error message for troubleshooting.
+
+### Error Message Format
+
+| Field               | Type     | Field Description      |
+| ------------------- | -------- | ---------------------- |
+| `error`             | String   | Error message string   |
+| `error_description` | String   | Human readable error description (can be localized) |
+| `error_details`     | String[] | Array of error details |
